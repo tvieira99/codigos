@@ -1,0 +1,38 @@
+global achou
+achou = False
+def PEL(entrMatrix,i,j):
+    entrMatrix[i][j] = 2
+#    print(entrMatrix)
+    if i == 4 and j == 4:
+        global achou
+        achou = True
+    #casos a checar
+    if i > 0 and entrMatrix[i-1][j] == 0:#CAMINHAR PARA CIMA
+        PEL(entrMatrix, i-1, j) 
+    if j < 4 and entrMatrix[i][j+1] == 0:#CAMINHAR PARA A DIREITA
+        PEL(entrMatrix, i, j+1) 
+    if j > 0 and entrMatrix[i][j-1] == 0:#CAMINHAR PARA A ESQUERDA 
+        PEL(entrMatrix, i, j-1) 
+    if i < 4 and entrMatrix[i+1][j] == 0:#CAMINHAR PARA BAIXO 
+        PEL(entrMatrix, i+1, j)
+    entrMatrix[i][j] = 0
+
+nTestes = int(input())
+for i in range(0, nTestes):
+    entrMatrix = []
+    t = input()
+    for j in range(0,5):
+        linha = input()
+        linha = linha.split(chr(0x20))
+        for k  in linha:
+            if k == '':
+                linha.remove(k)
+        print(linha)
+        linha = list(map(int,linha))
+        entrMatrix.append(linha)
+    achou = False
+    PEL(entrMatrix,0,0)
+    if achou:
+        print("COPS")
+    else:
+        print("ROBBERS")
