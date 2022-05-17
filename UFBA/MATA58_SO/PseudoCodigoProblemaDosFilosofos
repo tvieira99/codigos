@@ -1,0 +1,19 @@
+definetipo mutex garfos //define o nome garfos como semaforo(mutex)
+Cria Mesa m //cria mesa m
+m->garfos[5] //define 5 garfos para a mesa
+define Filosofo(id):
+	idFilosofo = id
+	comer():
+		P(m->garfos[idFilosofo+1])
+		P(m->garfos[idFilosofo+1%5])
+		print("comendo...")
+		V(m->garfos[idFilosofo+1])
+		V(m->garfos[idFilosofo+1%5])
+	pensar():
+		esperar()
+		print("pensando...")
+criarThread(Filosofo 1)
+criarThread(Filosofo 2)
+criarThread(Filosofo 3)
+criarThread(Filosofo 4)
+criarThread(Filosofo 5)
