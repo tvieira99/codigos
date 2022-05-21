@@ -5,21 +5,20 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-typedef struct Endereco {
-	int nPag;
-	int offsetDados;
-}
-addr;
+typedef struct FreeTableEntry {
+	struct Pagina* endereco;
+	bool loaded;
+	int contador;
+} FTEntry; 
 
 //ESTRUTURA DA PÁGINA, NÃO VOU PROTEGER CONTRA EXECUÇÃO OU NÃO
+
 typedef struct Pagina{
 	int pageId;
-	int processId;	
-	int contador;
 	bool carregada;
-	bool modificada;
 	int* dados;
 	int endereco;
+	struct Processos *processo;
 } page;
 
 //ESTRUTURA DO PROCESSO.
@@ -31,6 +30,10 @@ typedef struct Processos {
 	int quantum;
 	int sobrecarga;
 	int processId;
-	page* pages;
+	page* pageTable;
 } process;
+
+void addPageToRam();
+void initNewPage(process *processo, int pageId, unsigned int dados);
+int initNewProcess(process* Fila, int deadline, int tempoDeChegada, int tempoDeExec, int prioridade, int quantum, int sobrecarga);
 #endif
