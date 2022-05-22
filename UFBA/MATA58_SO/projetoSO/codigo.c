@@ -12,37 +12,23 @@ static int Disco[TAM_DISCO];
 static FTEntry FreeFrameList[TAM_RAM];
 static unsigned int RAM[TAM_RAM];
 static int paginacaoFIFOindex = 0;
+
 //implementing FIFO
 void paginacaoFIFO(){
-	printf("liberou uma página\n");
 	//pega o ponteiro da pagina que a FTL está gerenciando
 	page* paginaASair = FreeFrameList[paginacaoFIFOindex%50].endereco;
+	printf("\nEndereço da pagina a ser liberada %p\n", paginaASair);
 	FreeFrameList[paginacaoFIFOindex%50].loaded = false;
-	FreeFrameList[paginacaoFIFOindex%50].contador = 0;
+	FreeFrameList[paginacaoFIFOindex%50].lastTickUsed = 0;
 	FreeFrameList[paginacaoFIFOindex%50].endereco = NULL;
 
 	//desmarca a pagina como carregada
 	paginaASair->carregada = false;
 	Disco[indexDoDisco] = *(paginaASair->dados);
 	paginaASair->dados = &Disco[indexDoDisco];
+	paginaASair->FTEPointer = NULL;
 	indexDoDisco++;
-	paginacaoFIFOindex++;
-}
-
-void paginacaoFIFO(){
-	printf("liberou uma página\n");
-	//pega o ponteiro da pagina que a FTL está gerenciando
-	page* paginaASair = FreeFrameList[paginacaoFIFOindex%50].endereco;
-	FreeFrameList[paginacaoFIFOindex%50].loaded = false;
-	FreeFrameList[paginacaoFIFOindex%50].contador = 0;
-	FreeFrameList[paginacaoFIFOindex%50].endereco = NULL;
-
-	//desmarca a pagina como carregada
-	paginaASair->carregada = false;
-	Disco[indexDoDisco] = *(paginaASair->dados);
-	paginaASair->dados = &Disco[indexDoDisco];
-	indexDoDisco++;
-	paginacaoFIFOindex++;
+	paginacaoFIFOindex = paginacaoFIFOindex + 1;
 }
 
 void paginacaoLRU(){
@@ -51,20 +37,21 @@ void paginacaoLRU(){
 	int minContador = 0;
 	int ponteiroMaiorContagem = 0;
 	for (int i = 0; i < TAM_RAM; i++ ){
-		if(FreeFrameList[i].contador < minContador){
-			minContador = FreeFrameList[i].contador;
+		if(FreeFrameList[i].lastTickUsed < minContador){
+			minContador = FreeFrameList[i].lastTickUsed;
 			ponteiroMaiorContagem = i;
 		}
 	}
 	page* paginaASair = FreeFrameList[ponteiroMaiorContagem].endereco;
 	FreeFrameList[ponteiroMaiorContagem].loaded = false;
-	FreeFrameList[ponteiroMaiorContagem].contador = 0;
+	FreeFrameList[ponteiroMaiorContagem].lastTickUsed = 0;
 	FreeFrameList[ponteiroMaiorContagem].endereco = NULL;
 
 	//desmarca a pagina como carregada
 	paginaASair->carregada = false;
 	Disco[indexDoDisco] = *(paginaASair->dados);
 	paginaASair->dados = &Disco[indexDoDisco];
+	paginaASair->FTEPointer = NULL;
 	indexDoDisco++;
 }
 
@@ -72,12 +59,14 @@ void paginacaoLRU(){
 void addPageToRam(page* pagina, unsigned int dados){
 	for (int i = 0; i < TAM_RAM; i++){
 		if (FreeFrameList[i].loaded == false){
-			printf("dados: %u\n", dados);
+			printf("\ndados: %u", dados);
 			RAM[i] = dados;
 			pagina->dados = &RAM[i];
+			pagina->FTEPointer = &FreeFrameList[i];
+			pagina->carregada = true;
 			FreeFrameList[i].loaded = true;
 			FreeFrameList[i].endereco = pagina;
-			FreeFrameList[i].contador = 0;
+			FreeFrameList[i].lastTickUsed = 0;
 			break;
 		}
 		if (i == 49){
@@ -100,7 +89,7 @@ void initFreeFrameList(){
 		FTEntry newFTEntry;
 		newFTEntry.loaded = false;
 		newFTEntry.endereco = NULL;
-		newFTEntry.contador = 0;
+		newFTEntry.lastTickUsed = 0;
 		FreeFrameList[i] = newFTEntry;
 	}
 }
@@ -110,13 +99,23 @@ void initNewPage(process *processo, int pageId, unsigned int dados){
 	page newPage;
 	newPage.pageId = pageId;
 	newPage.processo = processo;
-	(*processo).pageTable[pageId-1] = newPage;
+	processo->pageTable[pageId] = newPage;
 	newPage.endereco = 0;
-	addPageToRam(&newPage, dados);	
+	addPageToRam(&processo->pageTable[pageId], dados);	
 }
 
-void runProcess(process* process){
-	process->tempoDeExec = process->tempoDeExec + 1; 
+void runProcess(process* process, int currentTick){
+	for (int i = 0; i < NUM_PAG_P_PROCESSOS; i++){
+		if (process->pageTable[i].carregada == false){
+			printf("\nProcesso %d não pode ser executado porque a página %d não foi carregada", process->processId, process->pageTable[i].pageId);
+			return;
+		}
+		process->pageTable[i].carregada;
+	}
+	printf("\nProcesso %d foi executado com sucesso", process->processId);
+	process->tempoDeExec = process->tempoDeExec + 1;
+	//PEGA UMA PÁGINA ALEATÓRIA PARA O PROCESSO ACESSAR
+	process->pageTable[rand()%10].FTEPointer->lastTickUsed = currentTick;
 }
 
 
@@ -147,20 +146,27 @@ int main(){
 	initFreeFrameList();
 	initRAM();
 	int process1 = initNewProcess(FilaDeProcessos, 0, 0, 0, 0, 0, 0);
+	runProcess(&FilaDeProcessos[0], 0);
 	int process2 = initNewProcess(FilaDeProcessos, 0, 0, 0, 0, 0, 0);
 	int process3 = initNewProcess(FilaDeProcessos, 0, 0, 0, 0, 0, 0);
 	int process4 = initNewProcess(FilaDeProcessos, 0, 0, 0, 0, 0, 0);
 	int process5 = initNewProcess(FilaDeProcessos, 0, 0, 0, 0, 0, 0);
 	int process6 = initNewProcess(FilaDeProcessos, 0, 0, 0, 0, 0, 0);
-	printf("Pagina %d do processo 1 existe!\n",FilaDeProcessos[0].pageTable[2].pageId);
+	runProcess(&FilaDeProcessos[0],10);
+	printf("\nPagina %d do processo 1 existe!",FilaDeProcessos[0].pageTable[2].pageId);
 	for (int i = 0; i < TAM_RAM; i++){
-			printf("%u ", RAM[i]);
+			printf("\n Endereco da pagina %p ", FreeFrameList[i].endereco);
 	}
 	for (int i = 0; i < NUM_PAG_P_PROCESSOS; i++){
 		if(!FilaDeProcessos[process1-1].pageTable[i].carregada){
 			printf("\nPagina %d não está carregada do processo %d", i, process1);
 		}
-	} 
+	}
+	for (int i = 0; i < TAM_DISCO; i++){
+		if (Disco[i] != 0){
+			printf("\nEsse dado está guardado no disco: %u", Disco[i]);
+		}
+	}
 	//SIMULAÇÃO DA RAM DE 200K COM PÁGINAS DE 4K
 	//page *Ram = malloc(sizeof(page)*50);
 	//SIMULAÇÃO DE DISCO

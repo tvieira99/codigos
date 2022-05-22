@@ -8,7 +8,7 @@
 typedef struct FreeTableEntry {
 	struct Pagina* endereco;
 	bool loaded;
-	int contador;
+	int lastTickUsed;
 } FTEntry; 
 
 //ESTRUTURA DA PÁGINA, NÃO VOU PROTEGER CONTRA EXECUÇÃO OU NÃO
@@ -18,6 +18,7 @@ typedef struct Pagina{
 	bool carregada;
 	int* dados;
 	int endereco;
+	struct FreeTableEntry* FTEPointer;
 	struct Processos *processo;
 } page;
 
