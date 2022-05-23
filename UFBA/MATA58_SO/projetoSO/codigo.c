@@ -1,33 +1,86 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "codigo.h"
+#include <time.h>
 #define TAMFILAPROCESSOS 10
 #define NUM_PAG_P_PROCESSOS 10
 #define TAM_DISCO 200
 #define TAM_RAM 50
 
+
+bool debug = true;
 static unsigned int indexDoDisco = 0;
+
 static process FilaDeProcessos[TAMFILAPROCESSOS];
-static int Disco[TAM_DISCO];
+
+static DEntry Disco[TAM_DISCO];
 static FTEntry FreeFrameList[TAM_RAM];
-static unsigned int RAM[TAM_RAM];
+static DEntry RAM[TAM_RAM];
 static int paginacaoFIFOindex = 0;
+
+
+void debugFunction(){
+	printf("\nAtual estado da fila de processos:");
+	for (int i = 0; i < TAMFILAPROCESSOS; i++){
+		if (FilaDeProcessos[i].processId > 0){
+			printf("\n\tProcesso %d está presente na fila de processos", FilaDeProcessos[i].processId);
+		}
+	}
+	printf("\nAtual estado das páginas de cada processo:");
+	for(int i = 0; i < TAMFILAPROCESSOS; i++){
+		if (FilaDeProcessos[i].processId > 0){
+			printf("\nProcesso %d", FilaDeProcessos[i].processId);
+			for (int j = 0; j < NUM_PAG_P_PROCESSOS; j++){
+				printf("\n\tPágina %d está:\n\t\tcarregada:%i\n\t\tdados:%i\n\t\tFTEPointer:%p", 
+				FilaDeProcessos[i].pageTable[j].pageId,
+				FilaDeProcessos[i].pageTable[j].carregada,
+				FilaDeProcessos[i].pageTable[j].dados->dados,
+				FilaDeProcessos[i].pageTable[j].FTEPointer
+				);
+			}
+		}
+	}
+	printf("\nAtual estado da RAM:");
+	printf("\n[");
+	for (int i = 0; i < TAM_RAM; i++){
+		printf("\n\tDados:%d\n\tUsed:%i", RAM[i].dados, RAM[i].used);
+	}
+	printf("]");
+
+	printf("\nAtual estado do Disco:");
+	printf("\n[");
+	for (int i = 0; i < TAM_DISCO; i++){
+		printf("\n\tDados:%d\n\tUsed:%i", Disco[i].dados, Disco[i].used);
+	}
+	printf("]");
+}
+
+DEntry* addToDisc(int dados){
+	for (int i = 0; i < TAM_DISCO; i++){
+		if (Disco[i].used == false){
+			DEntry newDEntry;
+			newDEntry.used = true;
+			newDEntry.dados = dados;
+			Disco[i] = newDEntry;
+			return &Disco[i];
+		}
+	}
+}
 
 //implementing FIFO
 void paginacaoFIFO(){
 	//pega o ponteiro da pagina que a FTL está gerenciando
 	page* paginaASair = FreeFrameList[paginacaoFIFOindex%50].endereco;
-	printf("\nEndereço da pagina a ser liberada %p\n", paginaASair);
+	if(debug == true){
+		printf("\nEndereço da pagina a ser liberada %p\n", paginaASair);
+	}
 	FreeFrameList[paginacaoFIFOindex%50].loaded = false;
 	FreeFrameList[paginacaoFIFOindex%50].lastTickUsed = 0;
-	FreeFrameList[paginacaoFIFOindex%50].endereco = NULL;
 
 	//desmarca a pagina como carregada
 	paginaASair->carregada = false;
-	Disco[indexDoDisco] = *(paginaASair->dados);
-	paginaASair->dados = &Disco[indexDoDisco];
+	paginaASair->dados = addToDisc(paginaASair->dados->dados);
 	paginaASair->FTEPointer = NULL;
-	indexDoDisco++;
 	paginacaoFIFOindex = paginacaoFIFOindex + 1;
 }
 
@@ -59,9 +112,12 @@ void paginacaoLRU(){
 void addPageToRam(page* pagina, unsigned int dados){
 	for (int i = 0; i < TAM_RAM; i++){
 		if (FreeFrameList[i].loaded == false){
-			printf("\ndados: %u", dados);
-			RAM[i] = dados;
+			DEntry newDEntry;
+			newDEntry.dados = dados;
+			newDEntry.used = true;
+			RAM[i] = newDEntry;
 			pagina->dados = &RAM[i];
+			
 			pagina->FTEPointer = &FreeFrameList[i];
 			pagina->carregada = true;
 			FreeFrameList[i].loaded = true;
@@ -78,7 +134,10 @@ void addPageToRam(page* pagina, unsigned int dados){
 
 void initRAM(){
 	for (int i = 0; i < TAM_RAM; i++){
-		RAM[i] = 0;
+		DEntry newDEntry;
+		newDEntry.dados = 0;
+		newDEntry.used = false;
+		RAM[i] = newDEntry;
 	}
 }
 
@@ -98,7 +157,6 @@ void initFreeFrameList(){
 void initNewPage(process *processo, int pageId, unsigned int dados){
 	page newPage;
 	newPage.pageId = pageId;
-	newPage.processo = processo;
 	processo->pageTable[pageId] = newPage;
 	newPage.endereco = 0;
 	addPageToRam(&processo->pageTable[pageId], dados);	
@@ -107,23 +165,28 @@ void initNewPage(process *processo, int pageId, unsigned int dados){
 void runProcess(process* process, int currentTick){
 	for (int i = 0; i < NUM_PAG_P_PROCESSOS; i++){
 		if (process->pageTable[i].carregada == false){
-			printf("\nProcesso %d não pode ser executado porque a página %d não foi carregada", process->processId, process->pageTable[i].pageId);
+			if(debug == true){
+				printf("\nProcesso %d não pode ser executado porque a página %d não foi carregada tentando por a página na ram", process->processId, process->pageTable[i].pageId);
+			}
+			addPageToRam(&process->pageTable[i], process->pageTable[i].dados->dados);
+			runProcess(process, currentTick);
 			return;
 		}
-		process->pageTable[i].carregada;
 	}
-	printf("\nProcesso %d foi executado com sucesso", process->processId);
+	int numRandom = rand()%10;
+	printf("\nProcesso %d foi executado com sucesso utilizando a página %d", process->processId, numRandom);
 	process->tempoDeExec = process->tempoDeExec + 1;
+
 	//PEGA UMA PÁGINA ALEATÓRIA PARA O PROCESSO ACESSAR
-	process->pageTable[rand()%10].FTEPointer->lastTickUsed = currentTick;
+	process->pageTable[numRandom].FTEPointer->lastTickUsed = currentTick;
 }
 
 
 //initNewProcess deve retornar o id do novo processo criado. retorna <0 caso o processo não tenha sido criado.
 
-int initNewProcess(process* Fila, int deadline, int tempoDeChegada, int tempoDeExec, int prioridade, int quantum, int sobrecarga) {
+int initNewProcess(int deadline, int tempoDeChegada, int tempoDeExec, int prioridade, int quantum, int sobrecarga) {
 	for (int i = 0; i < TAMFILAPROCESSOS; i++){
-		if(Fila[i].processId == 0){ 
+		if(FilaDeProcessos[i].processId == 0){ 
 			process newProcess;
 			newProcess.processId = i+1;
 			newProcess.deadline = deadline;
@@ -135,7 +198,7 @@ int initNewProcess(process* Fila, int deadline, int tempoDeChegada, int tempoDeE
 			for (int i = 0; i < NUM_PAG_P_PROCESSOS; i++){
 				initNewPage(&newProcess, i, rand());
 			}
-			Fila[i] = newProcess;
+			FilaDeProcessos[i] = newProcess;
 			return i+1;		
 		}
 	}
@@ -143,34 +206,20 @@ int initNewProcess(process* Fila, int deadline, int tempoDeChegada, int tempoDeE
 
 
 int main(){
+	srand(time(0));
 	initFreeFrameList();
 	initRAM();
-	int process1 = initNewProcess(FilaDeProcessos, 0, 0, 0, 0, 0, 0);
+	int process1 = initNewProcess(0, 0, 0, 0, 0, 0);
 	runProcess(&FilaDeProcessos[0], 0);
-	int process2 = initNewProcess(FilaDeProcessos, 0, 0, 0, 0, 0, 0);
-	int process3 = initNewProcess(FilaDeProcessos, 0, 0, 0, 0, 0, 0);
-	int process4 = initNewProcess(FilaDeProcessos, 0, 0, 0, 0, 0, 0);
-	int process5 = initNewProcess(FilaDeProcessos, 0, 0, 0, 0, 0, 0);
-	int process6 = initNewProcess(FilaDeProcessos, 0, 0, 0, 0, 0, 0);
+	int process2 = initNewProcess(0, 0, 0, 0, 0, 0);
+	int process3 = initNewProcess(0, 0, 0, 0, 0, 0);
+	int process4 = initNewProcess(0, 0, 0, 0, 0, 0);
+	int process5 = initNewProcess(0, 0, 0, 0, 0, 0);
+	int process6 = initNewProcess(0, 0, 0, 0, 0, 0);
+	if(debug == true){
+		debugFunction();
+	}
 	runProcess(&FilaDeProcessos[0],10);
-	printf("\nPagina %d do processo 1 existe!",FilaDeProcessos[0].pageTable[2].pageId);
-	for (int i = 0; i < TAM_RAM; i++){
-			printf("\n Endereco da pagina %p ", FreeFrameList[i].endereco);
-	}
-	for (int i = 0; i < NUM_PAG_P_PROCESSOS; i++){
-		if(!FilaDeProcessos[process1-1].pageTable[i].carregada){
-			printf("\nPagina %d não está carregada do processo %d", i, process1);
-		}
-	}
-	for (int i = 0; i < TAM_DISCO; i++){
-		if (Disco[i] != 0){
-			printf("\nEsse dado está guardado no disco: %u", Disco[i]);
-		}
-	}
-	//SIMULAÇÃO DA RAM DE 200K COM PÁGINAS DE 4K
-	//page *Ram = malloc(sizeof(page)*50);
-	//SIMULAÇÃO DE DISCO
-	//TABELAS DE BLOCOS LIVRES. TEMOS 50 BLOCOS LIVRES GUARDA OS IDs das páginas. SE O VALOR FOR <0. ESTÁ LIVRE.
-	//addr *FreeBlockTables = malloc(sizeof(int)*50);
+	debugFunction();
 
 }

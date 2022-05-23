@@ -5,6 +5,12 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+typedef struct DiscEntry {
+	bool used;
+	int dados;
+}
+DEntry;
+
 typedef struct FreeTableEntry {
 	struct Pagina* endereco;
 	bool loaded;
@@ -16,10 +22,9 @@ typedef struct FreeTableEntry {
 typedef struct Pagina{
 	int pageId;
 	bool carregada;
-	int* dados;
-	int endereco;
+	struct DiscEntry* dados;
+	int endereco; //Campo mock-up. Ainda não tem uso
 	struct FreeTableEntry* FTEPointer;
-	struct Processos *processo;
 } page;
 
 //ESTRUTURA DO PROCESSO.
@@ -36,5 +41,5 @@ typedef struct Processos {
 
 void addPageToRam();
 void initNewPage(process *processo, int pageId, unsigned int dados);
-int initNewProcess(process* Fila, int deadline, int tempoDeChegada, int tempoDeExec, int prioridade, int quantum, int sobrecarga);
+int initNewProcess(int deadline, int tempoDeChegada, int tempoDeExec, int prioridade, int quantum, int sobrecarga);
 #endif
