@@ -1,6 +1,5 @@
 #ifndef guard_codigo
 #define guard_codigo
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -42,5 +41,5 @@ typedef struct Processos {
 
 void addPageToRam();
 void initNewPage(process *processo, int pageId, int dados);
-int initNewProcess(int deadline, int tempoDeChegada, int tempoDeExec, int prioridade, int quantum, int sobrecarga);
+int initNewProcess(int deadline, int tempoDeChegada, int tempoDeExec, int prioridade);
 #endif
