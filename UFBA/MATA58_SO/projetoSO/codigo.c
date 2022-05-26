@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "codigo.h"
 #include <time.h>
+#include <unistd.h>
 #define TAMFILAPROCESSOS 10
 #define NUM_PAG_P_PROCESSOS 10
 #define TAM_DISCO 200
@@ -52,7 +53,7 @@ void debugFunction(){
 	for (int i = 0; i < TAM_DISCO; i++){
 		printf("\n\tDados:%d\n\tUsed:%i", Disco[i].dados, Disco[i].used);
 	}
-	printf("]");
+	printf("]"); 
 }
 
 DEntry* addToDisc(int dados){
@@ -204,22 +205,107 @@ int initNewProcess(int deadline, int tempoDeChegada, int tempoDeExec, int priori
 	}
 }
 
+void sortByTempoDeChegada()
+{
+	int size = sizeof FilaDeProcessos / sizeof *FilaDeProcessos;
+
+	int i, j;
+	struct Processos temp;
+
+	for(i = 0; i < size - 1; i++) {
+		for(j = i + 1; j < size; j++)
+		{
+			if (FilaDeProcessos[i].tempoDeChegada > FilaDeProcessos[j].tempoDeChegada) 
+			{
+				temp = FilaDeProcessos[i];
+				FilaDeProcessos[i] = FilaDeProcessos[j];
+				FilaDeProcessos[j] = temp;
+
+			}
+		}
+	}
+
+}
+
+void sortByTempoExec()
+{
+	int size = sizeof FilaDeProcessos / sizeof *FilaDeProcessos;
+
+	int i, j;
+	struct Processos temp;
+
+	sortByTempoDeChegada();
+
+	for(i = 0; i < size - 1; i++) {
+		for(j = i + 1; j < size; j++)
+		{
+			if (FilaDeProcessos[i].tempoDeChegada == FilaDeProcessos[j].tempoDeChegada) 
+			{
+				if (FilaDeProcessos[i].tempoDeExec > FilaDeProcessos[j].tempoDeExec) {
+					temp = FilaDeProcessos[i];
+					FilaDeProcessos[i] = FilaDeProcessos[j];
+					FilaDeProcessos[j] = temp;
+				}
+			}
+		}
+	}
+
+}
+
+
+void systemEscalonatorExecFIFOandSJF() 
+{
+	int size = sizeof FilaDeProcessos / sizeof *FilaDeProcessos;
+
+	for(int i = 0; i < size; i++) 
+	{
+		//sleep(FilaDeProcessos[i].tempoDeExec);
+		for (int j = 0; j < FilaDeProcessos[i].tempoDeExec; ++j) 
+		{
+			putchar('#'); 
+  	}
+		if (FilaDeProcessos[i].tempoDeExec != 0) 
+		{
+			printf("\n"); 
+			int tempodeEspera = (FilaDeProcessos[0].tempoDeChegada - 0) + FilaDeProcessos[0].tempoDeExec;
+			//int tempoDeExecEspera = FilaDeProcessos[i].tempoDeExec - FilaDeProcessos[i].entrada;
+		}
+		//int tempoDeExecTotal += tempoDeExecEspera;
+	}
+}
+
+void sjf()
+{
+	printf("\n================ SJF =================\n");
+	sortByTempoExec();
+	systemEscalonatorExecFIFOandSJF();
+};
+
+void fifo()
+{
+	printf("\n================ FIFO =================\n");
+	
+	sortByTempoDeChegada();
+	systemEscalonatorExecFIFOandSJF();
+};
+
 
 int main(){
 	srand(time(0));
 	initFreeFrameList();
 	initRAM();
-	int process1 = initNewProcess(0, 0, 0, 0, 0, 0);
+	int process1 = initNewProcess(0, 0, 2, 0, 0, 0);
 	runProcess(&FilaDeProcessos[0], 0);
-	int process2 = initNewProcess(0, 0, 0, 0, 0, 0);
-	int process3 = initNewProcess(0, 0, 0, 0, 0, 0);
-	int process4 = initNewProcess(0, 0, 0, 0, 0, 0);
-	int process5 = initNewProcess(0, 0, 0, 0, 0, 0);
-	int process6 = initNewProcess(0, 0, 0, 0, 0, 0);
+	int process2 = initNewProcess(0, 3, 5, 4, 2, 0);
+	int process3 = initNewProcess(0, 3, 9, 2, 0, 0);
+	int process4 = initNewProcess(0, 1, 6, 1, 0, 0);
+	int process5 = initNewProcess(0, 2, 2, 8, 0, 0);
+	int process6 = initNewProcess(0, 8, 1, 0, 0, 0);
 	if(debug == true){
 		debugFunction();
 	}
 	runProcess(&FilaDeProcessos[0],10);
 	debugFunction();
-
+	fifo();
+	sjf();
 }
