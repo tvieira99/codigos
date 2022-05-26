@@ -29,6 +29,7 @@ typedef struct Pagina{
 
 //ESTRUTURA DO PROCESSO.
 typedef struct Processos {
+	bool exited;
 	int tempoDeChegada;
 	int tempoDeExec;
 	int deadline;
@@ -40,6 +41,6 @@ typedef struct Processos {
 } process;
 
 void addPageToRam();
-void initNewPage(process *processo, int pageId, unsigned int dados);
+void initNewPage(process *processo, int pageId, int dados);
 int initNewProcess(int deadline, int tempoDeChegada, int tempoDeExec, int prioridade, int quantum, int sobrecarga);
 #endif
