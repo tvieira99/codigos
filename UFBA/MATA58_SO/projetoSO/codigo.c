@@ -381,18 +381,19 @@ void systemEscalonatorExecFIFOandSJF()
 
 	for(int i = 0; i < size; i++) 
 	{
-		//sleep(FilaDeProcessos[i].tempoDeExec);
-		for (int j = 0; j < FilaDeProcessos[i].tempoDeExec; ++j) 
-		{
-			putchar('#'); 
-  	}
-		if (FilaDeProcessos[i].tempoDeExec != 0) 
-		{
-			printf("\n"); 
-			int tempodeEspera = (FilaDeProcessos[0].tempoDeChegada - 0) + FilaDeProcessos[0].tempoDeExec;
-			//int tempoDeExecEspera = FilaDeProcessos[i].tempoDeExec - FilaDeProcessos[i].entrada;
-		}
-		//int tempoDeExecTotal += tempoDeExecEspera;
+    if (FilaDeProcessos[i].processId > 0 &&
+        FilaDeProcessos[i].exited == false
+        ) { // VERIFICA SE O PROCESSO ESTÁ ALOCADO
+      printf("\nProcesso %d foi selecionado \n", FilaDeProcessos[i].processId);
+      if (FilaDeProcessos[i].tempoDeChegada) 
+      { // VERIFICA SE O PROCESSO JA PODE SER RODADO
+        //FilaDeProcessos[i].processId = 1;
+        for (int j = 0; j < FilaDeProcessos[i].tempoDeExec; ++j) 
+        {
+          putchar('#'); 
+        }
+      }
+    }
 	}
 }
 
@@ -406,7 +407,6 @@ void sjf()
 void fifo()
 {
 	printf("\n================ FIFO =================\n");
-	
 	sortByTempoDeChegada();
 	systemEscalonatorExecFIFOandSJF();
 };
@@ -474,19 +474,19 @@ int main(){
 	initFreeFrameList();
 	initFilaDeProcessos();
 	initRAM();
-	int process1 = initNewProcess(0, 0, 2, 0);
-	runProcess(&FilaDeProcessos[0], 0);
-	int process2 = initNewProcess(0, 3, 5, 4);
-	int process3 = initNewProcess(0, 3, 9, 2);
-	int process4 = initNewProcess(0, 1, 6, 1);
-	int process5 = initNewProcess(0, 2, 2, 8);
-	int process6 = initNewProcess(0, 8, 1, 0);
+	int process1 = initNewProcess(1, 1, 2, 1);
+	//runProcess(&FilaDeProcessos[0], 0);
+	int process2 = initNewProcess(3, 4, 8, 4);
+	int process3 = initNewProcess(3, 2, 5, 2);
+	int process4 = initNewProcess(6, 1, 6, 1);
+	int process5 = initNewProcess(5, 2, 2, 8);
+	int process6 = initNewProcess(4, 8, 1, 0);
 	if(debug == true){
 		debugFunction();
 	}
-	runProcess(&FilaDeProcessos[0],10);
+	//runProcess(&FilaDeProcessos[0],10);
 	debugFunction();
 	fifo();
 	sjf();
-	ExecuteEDF(5);
+	//ExecuteEDF(5);
 }
