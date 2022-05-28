@@ -378,6 +378,9 @@ void sortByTempoExec()
 void systemEscalonatorExecFIFOandSJF() 
 {
 	int size = sizeof FilaDeProcessos / sizeof *FilaDeProcessos;
+  int delay;
+  
+  int turn = 0;
 
 	for(int i = 0; i < size; i++) 
 	{
@@ -385,16 +388,26 @@ void systemEscalonatorExecFIFOandSJF()
         FilaDeProcessos[i].exited == false
         ) { // VERIFICA SE O PROCESSO ESTÁ ALOCADO
       printf("\nProcesso %d foi selecionado \n", FilaDeProcessos[i].processId);
-      if (FilaDeProcessos[i].tempoDeChegada) 
-      { // VERIFICA SE O PROCESSO JA PODE SER RODADO
         //FilaDeProcessos[i].processId = 1;
         for (int j = 0; j < FilaDeProcessos[i].tempoDeExec; ++j) 
         {
           putchar('#'); 
         }
-      }
+        if (i > 0) {
+          if (FilaDeProcessos[i].tempoDeChegada <= turn) {
+            turn += (FilaDeProcessos[i].tempoDeExec);
+            delay = FilaDeProcessos[i].tempoDeExec;
+          } else {
+            delay = (FilaDeProcessos[i].tempoDeChegada - turn) + FilaDeProcessos[i].tempoDeExec;
+            turn += delay;
+          }
+          sleep(delay);
+          printf("\nProcesso %d foi executado em: %d s \n", FilaDeProcessos[i].processId, turn);
+        }
     }
 	}
+
+  printf("%d", turn);
 }
 
 void sjf()
@@ -476,7 +489,7 @@ int main(){
 	initRAM();
 	int process1 = initNewProcess(1, 1, 2, 1);
 	//runProcess(&FilaDeProcessos[0], 0);
-	int process2 = initNewProcess(3, 4, 8, 4);
+	int process2 = initNewProcess(1, 4, 8, 4);
 	int process3 = initNewProcess(3, 2, 5, 2);
 	int process4 = initNewProcess(6, 1, 6, 1);
 	int process5 = initNewProcess(5, 2, 2, 8);
