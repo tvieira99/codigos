@@ -2,12 +2,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#define TAMFILAEXECUCAO 30
 #define TAMFILAPROCESSOS 10
 #define NUM_PAG_P_PROCESSOS 10
 #define TAM_DISCO 200
 #define TAM_RAM 50
 
-bool debug = true;
+bool debug = false;
 static unsigned int indexDoDisco = 0;
 
 static process FilaDeProcessos[TAMFILAPROCESSOS];
@@ -21,9 +22,10 @@ void debugFunction() {
   printf("\nAtual estado do Disco:");
   printf("\n[");
   for (int i = 0; i < TAMFILAPROCESSOS; i++) {
-    printf("\nProcesso %d: \n\texited:%i\n\tTempo de exec:%d\n\t",
+    printf("\nProcesso %d: \n\texited:%i\n\tTempo de exec:%d\n\t\n\tEndereço "
+           "do processo:%p",
            FilaDeProcessos[i].processId, FilaDeProcessos[i].exited,
-           FilaDeProcessos[i].tempoDeExec);
+           FilaDeProcessos[i].tempoDeExec, &FilaDeProcessos[i]);
   }
   printf("]");
   printf("\nAtual estado das páginas de cada processo:");
@@ -253,20 +255,44 @@ int initNewProcess(int tempoDeChegada, int tempoDeExec, int deadline,
   }
 }
 
+bool alocado(int ponteiro) {
+  return ((FilaDeProcessos[ponteiro].processId > 0) &&
+          (FilaDeProcessos[ponteiro].exited == false));
+}
+
+bool disponivel(int ponteiro, int tick) {
+  return (alocado(ponteiro) &&
+          FilaDeProcessos[ponteiro].tempoDeChegada <= tick);
+}
+
+bool estaNaFila(process *ArrayTeste[], process *Processo, int inicioFila,
+                int fimFila) {
+  for (int i = inicioFila; i < fimFila; i++) {
+    if (Processo->processId == ArrayTeste[i]->processId) {
+      return true;
+    }
+  }
+  return false;
+}
+
 int ExecuteRoundRobin(int quantum, int sobrecarga) {
   bool breakflag = false;
   unsigned int ponteiro = 0;
   unsigned int actualTick = 0;
   unsigned int contadorDeTempo = 0;
   int lastProcess = -1;
-  while (true) {
+  process **FilaDeExecucao = malloc(sizeof(process *) * TAMFILAEXECUCAO);
+  int inicioFila = 0;
+  int fimFila = 0;
+  for (int k = 0; k < 21; k++) {
     ponteiro = ponteiro % TAMFILAPROCESSOS;
+    inicioFila = inicioFila % TAMFILAEXECUCAO;
+    fimFila = fimFila % TAMFILAEXECUCAO;
     // CHECA SE A FILA ESTÁ VAZIA
     for (int i = 0; i < TAMFILAPROCESSOS; i++) {
-      if (FilaDeProcessos[i].exited == true ||
-          FilaDeProcessos[i].processId == 0) {
+      if (!alocado(i)) {
         if (i == 9) {
-          printf("TERMINADO");
+          printf("\nTERMINADO");
           breakflag = true;
           return actualTick;
         }
@@ -274,54 +300,49 @@ int ExecuteRoundRobin(int quantum, int sobrecarga) {
       }
       break;
     }
-    if (breakflag) {
-      break;
-    }
+
     // O CÓDIGO ACIMA TENTA TERMINAR A FILA SEMPRE QUE RODA. PODE IGNORAR
-    if (FilaDeProcessos[ponteiro].processId > 0 &&
-        FilaDeProcessos[ponteiro].exited ==
-            false) { // VERIFICA SE O PROCESSO ESTÁ ALOCADO
-      if (FilaDeProcessos[ponteiro].tempoDeChegada <=
-          actualTick) { // VERIFICA SE O PROCESSO JA PODE SER RODADO
-        if (FilaDeProcessos[ponteiro].processId == lastProcess) {
-          contadorDeTempo++;
-        } else {
-          if (lastProcess != -1) {
-            printf("\nsobrecarga");
-            actualTick = actualTick + sobrecarga;
-          }
+    for (int intPonteiro = 0; intPonteiro < TAMFILAPROCESSOS; intPonteiro++) {
+      if (disponivel(intPonteiro, actualTick) &&
+          !estaNaFila(FilaDeExecucao, &FilaDeProcessos[intPonteiro], inicioFila,
+                      fimFila)) {
+        { // VERIFICA SE O PROCESSO JA PODE SER RODADO
+          FilaDeExecucao[fimFila] = &FilaDeProcessos[intPonteiro];
+          fimFila++;
         }
-        // O CODIGO ACIMA CONTA O TEMPO QUE CADA PROCESSO AINDA TEM NO
-        // PROCESSADOR, TAMBÉM TOMA CONTA DA SOBRECARGA
-        runProcess(&FilaDeProcessos[ponteiro], actualTick);
-        printf("\nProcesso %d; Tick:%d", FilaDeProcessos[ponteiro].processId,
-               actualTick);
-        lastProcess = FilaDeProcessos[ponteiro].processId;
-        if ((contadorDeTempo == quantum - 1) ||
-            (FilaDeProcessos[ponteiro].exited == true)) {
-          contadorDeTempo = 0;
-          ponteiro++;
-        }
-        actualTick++;
-      } else {
-        if (ponteiro == lastProcess - 1) {
-          printf("\nProcesso %d ainda não pode ser rodado, estamos no tick:%d, "
-                 "e ele está em: %d,ult. process:%d",
-                 FilaDeProcessos[ponteiro].processId, actualTick,
-                 FilaDeProcessos[ponteiro].tempoDeChegada, lastProcess);
-          actualTick++;
-        }
-        ponteiro++;
       }
-    } else {
-      if (ponteiro == lastProcess - 1) {
-        printf("\ncond 2 Processo %d não pode ser rodado, estamos no tick:%d, "
-               "e ele está em: %d,ult. process:%d",
-               FilaDeProcessos[ponteiro].processId, actualTick,
-               FilaDeProcessos[ponteiro].tempoDeChegada, lastProcess);
-        actualTick++;
+    }
+
+    if (disponivel(FilaDeExecucao[inicioFila]->processId - 1,
+                   actualTick)) { // UM HACKZINHO processId - 1  = indexNa fila
+                                  // de processos
+      runProcess(FilaDeExecucao[inicioFila], actualTick);
+      // printf("\n incioDaFila:%d %i", inicioFila, (contadorDeTempo));
+      if (FilaDeExecucao[inicioFila]->exited ||
+          (contadorDeTempo == quantum - 1)) {
+        if ((contadorDeTempo == quantum - 1) &&
+            !(FilaDeExecucao[inicioFila]->exited)) {
+          printf("\nColocando %d no final da fila",
+                 FilaDeExecucao[inicioFila]->processId);
+          FilaDeExecucao[fimFila] =
+              &FilaDeProcessos[(FilaDeExecucao[inicioFila]->processId - 1)];
+          fimFila++;
+        }
+        contadorDeTempo = -1;
+        inicioFila++;
       }
-      ponteiro++;
+      actualTick++;
+      contadorDeTempo++;
+    }
+
+    if (debug) {
+      printf("\ndps da op: inicioFila: %d; fimFila: %d tick: %d\nFila de "
+             "Execucao: [",
+             inicioFila, fimFila, actualTick);
+      for (int u = inicioFila; u < fimFila; u++) {
+        printf("%d, ", FilaDeExecucao[u]->processId);
+      }
+      printf("]");
     }
   }
 }
@@ -338,7 +359,7 @@ int ExecuteEDF(int sobrecarga) {
       if (FilaDeProcessos[i].exited == true ||
           FilaDeProcessos[i].processId == 0) {
         if (i == 9) {
-          //printf("\nEDF Terminado");
+          // printf("\nEDF Terminado");
           breakflag = true;
           return actualTick;
         }
@@ -350,12 +371,16 @@ int ExecuteEDF(int sobrecarga) {
       break;
     }
     // O CÓDIGO ACIMA TENTA TERMINAR A FILA SEMPRE QUE RODA. PODE IGNORAR
-    for (int i = 0; i <TAMFILAPROCESSOS; i++) {
-      if(FilaDeProcessos[ponteiro].exited ==  true){ ponteiro = i; continue;}
+    for (int i = 0; i < TAMFILAPROCESSOS; i++) {
+      if (FilaDeProcessos[ponteiro].exited == true) {
+        ponteiro = i;
+        continue;
+      }
       if (FilaDeProcessos[i].processId > 0 &&
           FilaDeProcessos[i].exited ==
               false) { // VERIFICA SE O PROCESSO ESTÁ ALOCADO
-        //printf("\nProcesso %d sendo testado\n\tExited?:%i", FilaDeProcessos[i].processId, FilaDeProcessos[i].exited);
+        // printf("\nProcesso %d sendo testado\n\tExited?:%i",
+        // FilaDeProcessos[i].processId, FilaDeProcessos[i].exited);
         if (FilaDeProcessos[i].tempoDeChegada <=
             actualTick) { // VERIFICA SE O PROCESSO JA PODE SER RODADO
           if (FilaDeProcessos[i].deadline <
@@ -365,7 +390,7 @@ int ExecuteEDF(int sobrecarga) {
         }
       }
     }
-    printf("\nProcesso %d foi selecionado", ponteiro+1);
+    printf("\nProcesso %d foi selecionado", ponteiro + 1);
     if (FilaDeProcessos[ponteiro].processId > 0 &&
         FilaDeProcessos[ponteiro].exited ==
             false) { // VERIFICA SE O PROCESSO ESTÁ ALOCADO
@@ -383,24 +408,24 @@ int ExecuteEDF(int sobrecarga) {
   }
 }
 
-
 int main() {
   // srand(time(0));
   initFreeFrameList();
   initFilaDeProcessos();
   initRAM();
-  int process1 = initNewProcess(0, 1, 2, 0);
-  int process2 = initNewProcess(0, 3, 5, 4);
-  int process3 = initNewProcess(0, 3, 9, 2);
+  int process1 = initNewProcess(0, 5, 2, 0);
+  int process2 = initNewProcess(0, 8, 5, 4);
+  int process3 = initNewProcess(2, 8, 9, 2);
   int process4 = initNewProcess(0, 1, 6, 1);
-  int process5 = initNewProcess(0, 2, 2, 8);
-  int process6 = initNewProcess(0, 8, 1, 0);
-  ExecuteEDF(5);
-  // int process2 = initNewProcess(0, 0, 0, 0, 0, 0);
-  // int process3 = initNewProcess(0, 0, 0, 0, 0, 0);
-  // int process4 = initNewProcess(0, 0, 0, 0, 0, 0);
-  // int process5 = initNewProcess(0, 0, 0, 0, 0, 0);
-  // int process6 = initNewProcess(0, 0, 0, 0, 0, 0);
+  //   int process5 = initNewProcess(0, 2, 2, 8);
+  //  int process6 = initNewProcess(0, 8, 1, 0);
+  ExecuteRoundRobin(3, 0);
+  // ExecuteEDF(5);
+  //  int process2 = initNewProcess(0, 0, 0, 0, 0, 0);
+  //  int process3 = initNewProcess(0, 0, 0, 0, 0, 0);
+  //  int process4 = initNewProcess(0, 0, 0, 0, 0, 0);
+  //  int process5 = initNewProcess(0, 0, 0, 0, 0, 0);
+  //  int process6 = initNewProcess(0, 0, 0, 0, 0, 0);
   if (debug) {
     debugFunction();
   }
