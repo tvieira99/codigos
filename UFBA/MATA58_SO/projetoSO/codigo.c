@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 #define TAMFILAEXECUCAO 30
 #define TAMFILAPROCESSOS 10
 #define NUM_PAG_P_PROCESSOS 10
@@ -284,7 +285,7 @@ int ExecuteRoundRobin(int quantum, int sobrecarga) {
   process **FilaDeExecucao = malloc(sizeof(process *) * TAMFILAEXECUCAO);
   int inicioFila = 0;
   int fimFila = 0;
-  for (int k = 0; k < 21; k++) {
+  while (true) {
     ponteiro = ponteiro % TAMFILAPROCESSOS;
     inicioFila = inicioFila % TAMFILAEXECUCAO;
     fimFila = fimFila % TAMFILAEXECUCAO;
@@ -408,18 +409,96 @@ int ExecuteEDF(int sobrecarga) {
   }
 }
 
+void sortByTempoDeChegada() {
+  int i, j;
+  struct Processos temp;
+
+  for (i = 0; i < TAMFILAPROCESSOS - 1; i++) {
+    for (j = i + 1; j < TAMFILAPROCESSOS; j++) {
+      if (FilaDeProcessos[i].tempoDeChegada >
+          FilaDeProcessos[j].tempoDeChegada) {
+        temp = FilaDeProcessos[i];
+        FilaDeProcessos[i] = FilaDeProcessos[j];
+        FilaDeProcessos[j] = temp;
+      }
+    }
+  }
+}
+
+void sortByTempoExec() {
+  int size = (sizeof FilaDeProcessos) / (sizeof *FilaDeProcessos);
+  int i, j;
+  struct Processos temp;
+  sortByTempoDeChegada();
+  for (i = 0; i < size - 1; i++) {
+    for (j = i + 1; j < size; j++) {
+      if (FilaDeProcessos[i].tempoDeChegada ==
+          FilaDeProcessos[j].tempoDeChegada) {
+        if (FilaDeProcessos[i].tempoDeExec > FilaDeProcessos[j].tempoDeExec) {
+          temp = FilaDeProcessos[i];
+          FilaDeProcessos[i] = FilaDeProcessos[j];
+          FilaDeProcessos[j] = temp;
+        }
+      }
+    }
+  }
+}
+
+void systemEscalonatorExecFIFOandSJF() {
+  int size = sizeof FilaDeProcessos / sizeof *FilaDeProcessos;
+  int delay;
+  int turn = 0;
+  for (int i = 0; i < size; i++) {
+    if (FilaDeProcessos[i].processId > 0 &&
+        FilaDeProcessos[i].exited ==
+            false) { // VERIFICA SE O PROCESSO ESTÁ ALOCADO
+      printf("\nProcesso %d foi selecionado \n", FilaDeProcessos[i].processId);
+      // FilaDeProcessos[i].processId = 1;
+      for (int j = 0; j < FilaDeProcessos[i].tempoDeExec; ++j) {
+        putchar('#');
+      }
+      if (FilaDeProcessos[i].tempoDeChegada <= turn) {
+        turn += (FilaDeProcessos[i].tempoDeExec);
+        delay = FilaDeProcessos[i].tempoDeExec;
+      } else {
+        delay = (FilaDeProcessos[i].tempoDeChegada - turn) +
+                FilaDeProcessos[i].tempoDeExec;
+        turn += delay;
+      }
+      if(!debug)sleep(delay);
+      printf("\nProcesso %d foi executado em: %d s \n",
+             FilaDeProcessos[i].processId, turn);
+    }
+  }
+
+  printf("%d", turn);
+}
+
+void sjf() {
+  printf("\n================ SJF =================\n");
+  sortByTempoExec();
+  systemEscalonatorExecFIFOandSJF();
+};
+
+void fifo() {
+  printf("\n================ FIFO =================\n");
+  sortByTempoDeChegada();
+  systemEscalonatorExecFIFOandSJF();
+};
+
 int main() {
   // srand(time(0));
   initFreeFrameList();
   initFilaDeProcessos();
   initRAM();
   int process1 = initNewProcess(0, 5, 2, 0);
-  int process2 = initNewProcess(0, 8, 5, 4);
+  int process2 = initNewProcess(2, 8, 5, 4);
   int process3 = initNewProcess(2, 8, 9, 2);
-  int process4 = initNewProcess(0, 1, 6, 1);
+  int process4 = initNewProcess(2, 1, 6, 1);
   //   int process5 = initNewProcess(0, 2, 2, 8);
   //  int process6 = initNewProcess(0, 8, 1, 0);
-  ExecuteRoundRobin(3, 0);
+  // ExecuteRoundRobin(3, 0);
+  ExecuteRoundRobin(3, 1);
   // ExecuteEDF(5);
   //  int process2 = initNewProcess(0, 0, 0, 0, 0, 0);
   //  int process3 = initNewProcess(0, 0, 0, 0, 0, 0);
