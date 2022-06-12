@@ -486,6 +486,17 @@ void fifo() {
   systemEscalonatorExecFIFOandSJF();
 };
 
+void ganttChartDrawer() {
+  printf("GANTT");
+  for (int i = 0; i < TAMFILAPROCESSOS; i++){
+    if(alocado(i)){
+      printf("\nProcesso %d alocado", i+1);
+    }
+  }
+}
+
+// INICIAR PROCESSO POR ENTRADAS
+
 int main() {
   // srand(time(0));
   initFreeFrameList();
@@ -495,10 +506,11 @@ int main() {
   int process2 = initNewProcess(2, 8, 5, 4);
   int process3 = initNewProcess(2, 8, 9, 2);
   int process4 = initNewProcess(2, 1, 6, 1);
+  ganttChartDrawer();
   //   int process5 = initNewProcess(0, 2, 2, 8);
   //  int process6 = initNewProcess(0, 8, 1, 0);
   // ExecuteRoundRobin(3, 0);
-  ExecuteRoundRobin(3, 1);
+  //ExecuteRoundRobin(3, 1);
   // ExecuteEDF(5);
   //  int process2 = initNewProcess(0, 0, 0, 0, 0, 0);
   //  int process3 = initNewProcess(0, 0, 0, 0, 0, 0);
