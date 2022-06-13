@@ -379,7 +379,7 @@ void systemEscalonatorExecFIFOandSJF()
 {
 	int size = sizeof FilaDeProcessos / sizeof *FilaDeProcessos;
   int delay;
-  
+  int tempoEspera = 0;
   int turn = 0;
 
 	for(int i = 0; i < size; i++) 
@@ -387,12 +387,18 @@ void systemEscalonatorExecFIFOandSJF()
     if (FilaDeProcessos[i].processId > 0 &&
         FilaDeProcessos[i].exited == false
         ) { // VERIFICA SE O PROCESSO ESTÁ ALOCADO
-      printf("\nProcesso %d foi selecionado \n", FilaDeProcessos[i].processId);
+      //printf("\nProcesso %d foi selecionado \n", FilaDeProcessos[i].processId);
         //FilaDeProcessos[i].processId = 1;
+        for (int j = 0; j < turn; ++j) 
+        {
+          putchar(' '); 
+        }
         for (int j = 0; j < FilaDeProcessos[i].tempoDeExec; ++j) 
         {
           putchar('#'); 
+          sleep(1);
         }
+        printf("\n");
         if (i > 0) {
           if (FilaDeProcessos[i].tempoDeChegada <= turn) {
             turn += (FilaDeProcessos[i].tempoDeExec);
@@ -402,7 +408,7 @@ void systemEscalonatorExecFIFOandSJF()
             turn += delay;
           }
           sleep(delay);
-          printf("\nProcesso %d foi executado em: %d s \n", FilaDeProcessos[i].processId, turn);
+          //printf("\nProcesso %d foi executado em: %d s \n", FilaDeProcessos[i].processId, turn);
         }
     }
 	}
