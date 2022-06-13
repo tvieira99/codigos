@@ -550,7 +550,8 @@ int main() {
     initNewProcess(tempoDeChegada, tempoDeExec, deadline, prioridade);
   }
   int scan = 0;
-  printf("\nEscolha entre as opções:\n0 -> EDF\n1 -> RoundRobin\n2 -> SJF\n3 -> Fifo\n");
+  printf("\nEscolha entre as opções:\n0 -> EDF\n1 -> RoundRobin\n2 -> SJF\n3 "
+         "-> Fifo\n");
   scanf("%d", &scan);
   switch (scan) {
   case 0: {
@@ -558,6 +559,7 @@ int main() {
     printf("\n sobrecarga:\n");
     scanf("%d", &sobrecarga);
     ExecuteEDF(sobrecarga);
+    ganttChartDrawer();
     break;
   }
   case 1: {
@@ -565,6 +567,7 @@ int main() {
     printf("\n sobrecarga, quantum\n");
     scanf("%d %d", &sobrecarga, &quantum);
     ExecuteRoundRobin(quantum, sobrecarga);
+    ganttChartDrawer();
     break;
   }
   case 2: {
@@ -576,7 +579,6 @@ int main() {
     break;
   }
   }
-  ganttChartDrawer();
   if (debug) {
     debugFunction();
   }
