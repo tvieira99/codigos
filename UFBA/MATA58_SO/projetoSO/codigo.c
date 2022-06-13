@@ -8,6 +8,7 @@
 #define NUM_PAG_P_PROCESSOS 10
 #define TAM_DISCO 200
 #define TAM_RAM 50
+#define TAMCHARTDRAWERARRAY 500
 
 bool debug = false;
 static unsigned int indexDoDisco = 0;
@@ -18,6 +19,7 @@ static DEntry Disco[TAM_DISCO];
 static FTEntry FreeFrameList[TAM_RAM];
 static DEntry RAM[TAM_RAM];
 static int paginacaoFIFOindex = 0;
+static tuple_TP_chart ChartDrawerrArray[TAMCHARTDRAWERARRAY];
 
 void debugFunction() {
   printf("\nAtual estado do Disco:");
@@ -232,7 +234,14 @@ void runProcess(process *process,
 
 // initNewProcess deve retornar o id do novo processo criado. retorna <0 caso o
 // processo não tenha sido criado.
-
+int initChartDrawerArray() {
+  tuple_TP_chart aux;
+  aux.proc = 0;
+  aux.tick = 0;
+  for (int i = 0; i < TAMCHARTDRAWERARRAY; i++) {
+    ChartDrawerrArray[i] = aux;
+  }
+}
 int initNewProcess(int tempoDeChegada, int tempoDeExec, int deadline,
                    int prioridade) {
   for (int i = 0; i < TAMFILAPROCESSOS; i++) {
@@ -276,8 +285,19 @@ bool estaNaFila(process *ArrayTeste[], process *Processo, int inicioFila,
   return false;
 }
 
+void add_to_drawerArray(int tick, int process) {
+  for (int i = 0; i < TAMCHARTDRAWERARRAY; i++) {
+    if (ChartDrawerrArray[i].proc == 0) {
+      tuple_TP_chart aux;
+      aux.proc = process;
+      aux.tick = tick;
+      ChartDrawerrArray[i] = aux;
+      return;
+    }
+  }
+}
+
 int ExecuteRoundRobin(int quantum, int sobrecarga) {
-  bool breakflag = false;
   unsigned int ponteiro = 0;
   unsigned int actualTick = 0;
   unsigned int contadorDeTempo = 0;
@@ -294,7 +314,6 @@ int ExecuteRoundRobin(int quantum, int sobrecarga) {
       if (!alocado(i)) {
         if (i == 9) {
           printf("\nTERMINADO");
-          breakflag = true;
           return actualTick;
         }
         continue;
@@ -318,6 +337,7 @@ int ExecuteRoundRobin(int quantum, int sobrecarga) {
                    actualTick)) { // UM HACKZINHO processId - 1  = indexNa fila
                                   // de processos
       runProcess(FilaDeExecucao[inicioFila], actualTick);
+      add_to_drawerArray(actualTick, FilaDeExecucao[inicioFila]->processId);
       // printf("\n incioDaFila:%d %i", inicioFila, (contadorDeTempo));
       if (FilaDeExecucao[inicioFila]->exited ||
           (contadorDeTempo == quantum - 1)) {
@@ -331,6 +351,7 @@ int ExecuteRoundRobin(int quantum, int sobrecarga) {
         }
         contadorDeTempo = -1;
         inicioFila++;
+        actualTick = actualTick + sobrecarga;
       }
       actualTick++;
       contadorDeTempo++;
@@ -349,7 +370,6 @@ int ExecuteRoundRobin(int quantum, int sobrecarga) {
 }
 
 int ExecuteEDF(int sobrecarga) {
-  bool breakflag = false;
   unsigned int ponteiro = 2;
   unsigned int actualTick = 0;
   int lastProcess = -1;
@@ -357,18 +377,13 @@ int ExecuteEDF(int sobrecarga) {
     ponteiro = 0;
     // CHECA SE A FILA ESTÁ VAZIA
     for (int i = 0; i < TAMFILAPROCESSOS; i++) {
-      if (FilaDeProcessos[i].exited == true ||
-          FilaDeProcessos[i].processId == 0) {
+      if (!alocado(i)) {
         if (i == 9) {
-          // printf("\nEDF Terminado");
-          breakflag = true;
+          printf("\nTERMINADO");
           return actualTick;
         }
         continue;
       }
-      break;
-    }
-    if (breakflag) {
       break;
     }
     // O CÓDIGO ACIMA TENTA TERMINAR A FILA SEMPRE QUE RODA. PODE IGNORAR
@@ -377,32 +392,28 @@ int ExecuteEDF(int sobrecarga) {
         ponteiro = i;
         continue;
       }
-      if (FilaDeProcessos[i].processId > 0 &&
-          FilaDeProcessos[i].exited ==
-              false) { // VERIFICA SE O PROCESSO ESTÁ ALOCADO
-        // printf("\nProcesso %d sendo testado\n\tExited?:%i",
-        // FilaDeProcessos[i].processId, FilaDeProcessos[i].exited);
-        if (FilaDeProcessos[i].tempoDeChegada <=
-            actualTick) { // VERIFICA SE O PROCESSO JA PODE SER RODADO
-          if (FilaDeProcessos[i].deadline <
-              FilaDeProcessos[ponteiro].deadline) {
-            ponteiro = i;
-          }
+      if (disponivel(i, actualTick)) { // VERIFICA SE O PROCESSO ESTÁ ALOCADO
+        if (FilaDeProcessos[i].deadline < FilaDeProcessos[ponteiro].deadline) {
+          ponteiro = i;
         }
       }
     }
+
     printf("\nProcesso %d foi selecionado", ponteiro + 1);
-    if (FilaDeProcessos[ponteiro].processId > 0 &&
-        FilaDeProcessos[ponteiro].exited ==
-            false) { // VERIFICA SE O PROCESSO ESTÁ ALOCADO
+    if (alocado(ponteiro)) { // VERIFICA SE O PROCESSO ESTÁ ALOCADO
       printf("\nProcesso %dfoi selecionado",
              FilaDeProcessos[ponteiro].processId);
       if (FilaDeProcessos[ponteiro].tempoDeChegada <=
           actualTick) { // VERIFICA SE O PROCESSO JA PODE SER RODADO
+        if (actualTick == 0) {
+          lastProcess = FilaDeProcessos[ponteiro].processId;
+        }
         if (lastProcess != FilaDeProcessos[ponteiro].processId) {
           actualTick = actualTick + sobrecarga;
+          lastProcess = FilaDeProcessos[ponteiro].processId;
         }
         runProcess(&FilaDeProcessos[ponteiro], actualTick);
+        add_to_drawerArray(actualTick, FilaDeProcessos[ponteiro].processId);
         actualTick++;
       }
     }
@@ -447,33 +458,41 @@ void sortByTempoExec() {
 void systemEscalonatorExecFIFOandSJF() {
   int size = sizeof FilaDeProcessos / sizeof *FilaDeProcessos;
   int delay;
+  int tempoEspera = 0;
   int turn = 0;
+
   for (int i = 0; i < size; i++) {
     if (FilaDeProcessos[i].processId > 0 &&
         FilaDeProcessos[i].exited ==
-            false) { // VERIFICA SE O PROCESSO ESTÁ ALOCADO
-      printf("\nProcesso %d foi selecionado \n", FilaDeProcessos[i].processId);
-      // FilaDeProcessos[i].processId = 1;
+            false) { // VERIFICA SE O PROCESSO ESTÃ ALOCADO
+                     // printf("\nProcesso %d foi selecionado \n",
+      // FilaDeProcessos[i].processId); FilaDeProcessos[i].processId = 1;
+      for (int j = 0; j < turn; ++j) {
+        putchar(' ');
+      }
       for (int j = 0; j < FilaDeProcessos[i].tempoDeExec; ++j) {
         putchar('#');
+        sleep(1);
       }
-      if (FilaDeProcessos[i].tempoDeChegada <= turn) {
-        turn += (FilaDeProcessos[i].tempoDeExec);
-        delay = FilaDeProcessos[i].tempoDeExec;
-      } else {
-        delay = (FilaDeProcessos[i].tempoDeChegada - turn) +
-                FilaDeProcessos[i].tempoDeExec;
-        turn += delay;
+      printf("\n");
+      if (i > 0) {
+        if (FilaDeProcessos[i].tempoDeChegada <= turn) {
+          turn += (FilaDeProcessos[i].tempoDeExec);
+          delay = FilaDeProcessos[i].tempoDeExec;
+        } else {
+          delay = (FilaDeProcessos[i].tempoDeChegada - turn) +
+                  FilaDeProcessos[i].tempoDeExec;
+          turn += delay;
+        }
+        sleep(delay);
+        // printf("\nProcesso %d foi executado em: %d s \n",
+        // FilaDeProcessos[i].processId, turn);
       }
-      if(!debug)sleep(delay);
-      printf("\nProcesso %d foi executado em: %d s \n",
-             FilaDeProcessos[i].processId, turn);
     }
   }
 
   printf("%d", turn);
 }
-
 void sjf() {
   printf("\n================ SJF =================\n");
   sortByTempoExec();
@@ -486,11 +505,28 @@ void fifo() {
   systemEscalonatorExecFIFOandSJF();
 };
 
+void repeatLine(int numDeRepeticoes) {
+  for (int i = 0; i < numDeRepeticoes; i++) {
+    printf(" ");
+  }
+}
+
 void ganttChartDrawer() {
-  printf("GANTT");
-  for (int i = 0; i < TAMFILAPROCESSOS; i++){
-    if(alocado(i)){
-      printf("\nProcesso %d alocado", i+1);
+  // system("clear");
+  for (int i = 0; i < TAMFILAPROCESSOS; i++) {
+    if (FilaDeProcessos[i].exited == true) {
+      printf("\nProcesso %d:", i + 1);
+      int lastTick = 0;
+      for (int j = 0; j < TAMCHARTDRAWERARRAY; j++) {
+        if (ChartDrawerrArray[j].proc == i + 1) {
+          int delta = ChartDrawerrArray[j].tick - lastTick;
+          if (delta == 1)
+            delta = 0;
+          repeatLine(delta);
+          lastTick = ChartDrawerrArray[j].tick;
+          printf("#");
+        }
+      }
     }
   }
 }
@@ -501,22 +537,46 @@ int main() {
   // srand(time(0));
   initFreeFrameList();
   initFilaDeProcessos();
+  initChartDrawerArray();
   initRAM();
-  int process1 = initNewProcess(0, 5, 2, 0);
-  int process2 = initNewProcess(2, 8, 5, 4);
-  int process3 = initNewProcess(2, 8, 9, 2);
-  int process4 = initNewProcess(2, 1, 6, 1);
+  printf("\nNúmero de processos a serem iniciados (max 10): \n");
+  int num = 0;
+  scanf("%d", &num);
+  for (int i = 0; i < num; i++) {
+    int tempoDeChegada, tempoDeExec, deadline, prioridade;
+    printf("Coloque em ordem: tempo de chegada, tempo de execução, deadline, "
+           "prioridade\n");
+    scanf("%d %d %d %d", &tempoDeChegada, &tempoDeExec, &deadline, &prioridade);
+    initNewProcess(tempoDeChegada, tempoDeExec, deadline, prioridade);
+  }
+  int scan = 0;
+  printf("\nEscolha entre as opções:\n0 -> EDF\n1 -> RoundRobin\n2 -> SJF\n3 -> Fifo\n");
+  scanf("%d", &scan);
+  switch (scan) {
+  case 0: {
+    int sobrecarga;
+    printf("\n sobrecarga:\n");
+    scanf("%d", &sobrecarga);
+    ExecuteEDF(sobrecarga);
+    break;
+  }
+  case 1: {
+    int sobrecarga, quantum;
+    printf("\n sobrecarga, quantum\n");
+    scanf("%d %d", &sobrecarga, &quantum);
+    ExecuteRoundRobin(quantum, sobrecarga);
+    break;
+  }
+  case 2: {
+    sjf();
+    break;
+  }
+  case 3: {
+    fifo();
+    break;
+  }
+  }
   ganttChartDrawer();
-  //   int process5 = initNewProcess(0, 2, 2, 8);
-  //  int process6 = initNewProcess(0, 8, 1, 0);
-  // ExecuteRoundRobin(3, 0);
-  //ExecuteRoundRobin(3, 1);
-  // ExecuteEDF(5);
-  //  int process2 = initNewProcess(0, 0, 0, 0, 0, 0);
-  //  int process3 = initNewProcess(0, 0, 0, 0, 0, 0);
-  //  int process4 = initNewProcess(0, 0, 0, 0, 0, 0);
-  //  int process5 = initNewProcess(0, 0, 0, 0, 0, 0);
-  //  int process6 = initNewProcess(0, 0, 0, 0, 0, 0);
   if (debug) {
     debugFunction();
   }

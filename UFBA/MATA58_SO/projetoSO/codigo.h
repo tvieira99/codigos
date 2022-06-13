@@ -9,6 +9,11 @@ typedef struct DiscEntry {
 	int dados;
 }
 DEntry;
+//TP é para Tick Process
+typedef struct tupleDrawer {
+	int tick;
+	int proc;
+} tuple_TP_chart;
 
 typedef struct FreeTableEntry {
 	struct Pagina* endereco;
